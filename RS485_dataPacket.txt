@@ -1,0 +1,66 @@
+--- Min/Max & Balancing Data ---
+Voltage Range:
+  Highest: 3.657V (Cell 2)
+  Lowest:  3.648V (Cell 4)
+
+Temperature Range:
+  Highest: 26°C (Sensor 1)
+  Lowest:  26°C (Sensor 1)
+
+Cell Balancing Status:
+  Actively balancing cells: ['error']
+
+--- Complete BMS Data Dump ---
+Fetching all parameters at once...
+
+{
+    "soc": {
+        "total_voltage": 21.9,
+        "current": 0.0,
+        "soc_percent": 49.6
+    },
+    "cell_voltage_range": {
+        "highest_voltage": 3.657,
+        "highest_cell": 2,
+        "lowest_voltage": 3.648,
+        "lowest_cell": 4
+    },
+    "temperature_range": {
+        "highest_temperature": 26,
+        "highest_sensor": 1,
+        "lowest_temperature": 26,
+        "lowest_sensor": 1
+    },
+    "mosfet_status": {
+        "mode": "stationary",
+        "charging_mosfet": true,
+        "discharging_mosfet": true,
+        "capacity_ah": 14.88
+    },
+    "status": {
+        "cells": 6,
+        "temperature_sensors": 2,
+        "charger_running": false,
+        "load_running": false,
+        "states": {
+            "DI1": false
+        },
+        "cycles": 0
+    },
+    "cell_voltages": {
+        "1": 3.65,
+        "2": 3.657,
+        "3": 3.656,
+        "4": 3.647,
+        "5": 3.65,
+        "6": 3.65
+    },
+    "temperatures": {
+        "1": 26,
+        "2": 26
+    },
+    "balancing_status": {
+        "error": "not implemented"
+    },
+    "errors": []
+}
