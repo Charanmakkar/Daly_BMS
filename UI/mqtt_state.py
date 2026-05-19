@@ -207,11 +207,19 @@ class MQTTManager:
             target=self._run, args=(broker, port),
             daemon=True, name="mqtt-thread"
         )
+        print(f"[MQTT] Starting MQTT thread to connect to {broker}:{port} …")
         thread.start()
 
     def _run(self, broker: str, port: int):
+        print(f"[MQTT] MQTT thread running. Connecting to {broker}:{port} …")
         client = mqtt.Client(client_id="dashboard_subscriber")
-
+        print("[MQTT] MQTT client created.")
+        print(f"[MQTT] Setting username and password for HiveMQ Cloud: {MQTT_USERNAME}")
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        if MQTT_USE_TLS:
+            print("[MQTT] Enabling TLS for HiveMQ Cloud.")
+            client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT)
+            client.tls_insecure_set(False)
         
 
         client.on_connect    = self._on_connect
@@ -222,6 +230,7 @@ class MQTTManager:
         while True:
             try:
                 client.connect(broker, port, keepalive=30)
+                print(f"[MQTT] Connected with client ID: {client._client_id.decode()}")
                 self._client = client
                 client.loop_forever()
             except Exception as exc:
@@ -229,9 +238,10 @@ class MQTTManager:
                 print(f"[MQTT] Connection failed: {exc}. "
                       f"Retrying in {retry_delay}s …")
                 time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 30)
+                retry_delay = min(retry_delay * 2, 10)
 
     def _on_connect(self, client, userdata, flags, rc):
+        print(f"[MQTT] Connection result: {mqtt.connack_string(rc)} (code {rc})")
         if rc == 0:
             AppState().connected = True
             for topic in TOPICS:

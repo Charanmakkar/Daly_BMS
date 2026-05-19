@@ -54,8 +54,8 @@ with st.sidebar:
 
     # Connection settings
     st.subheader("MQTT Connection")
-    broker = st.text_input("Broker IP", value="localhost", key="broker_ip")
-    port   = st.number_input("Port", value=1883, min_value=1, max_value=65535,
+    broker = st.text_input("Broker IP", value="4927161c6b0c474a9aa19d86178cf2b1.s1.eu.hivemq.cloud", key="broker_ip")
+    port   = st.number_input("Port", value=8883, min_value=1, max_value=65535,
                               key="broker_port")
 
     # Start MQTT (only once per session)
