@@ -75,5 +75,8 @@ def read_all_daly_data(port):
 
 if __name__ == "__main__":
     # CHANGE THIS to your actual port (e.g., 'COM4' or '/dev/ttyUSB0')
-    RS485_PORT = 'COM6' 
-    read_all_daly_data(RS485_PORT)
+    RS485_PORT = 'COM8'
+
+    while(1):
+        read_all_daly_data(RS485_PORT)
+##        time.sleep(0.1)
