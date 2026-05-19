@@ -1,12 +1,16 @@
 import json
 import time
 import ssl
+import csv
+import os
+from datetime import datetime
+
 import paho.mqtt.client as mqtt
 from dalybms import DalyBMS
 
-# ==========================================
+# =====================================================
 # MQTT CONFIGURATION
-# ==========================================
+# =====================================================
 
 BROKER = "4927161c6b0c474a9aa19d86178cf2b1.s1.eu.hivemq.cloud"
 PORT = 8883
@@ -16,15 +20,21 @@ PASSWORD = "Praveen@81433"
 
 TOPIC = "bms/full"
 
-# ==========================================
+# =====================================================
 # DALY BMS CONFIGURATION
-# ==========================================
+# =====================================================
 
 RS485_PORT = "COM8"
 
-# ==========================================
+# =====================================================
+# CSV CONFIGURATION
+# =====================================================
+
+CSV_FILE = "bms_data_log.csv"
+
+# =====================================================
 # MQTT CALLBACKS
-# ==========================================
+# =====================================================
 
 def on_connect(client, userdata, flags, rc):
 
@@ -34,9 +44,9 @@ def on_connect(client, userdata, flags, rc):
     else:
         print(f"MQTT Connection Failed: {rc}")
 
-# ==========================================
+# =====================================================
 # MQTT CLIENT SETUP
-# ==========================================
+# =====================================================
 
 client = mqtt.Client()
 
@@ -55,9 +65,9 @@ client.connect(BROKER, PORT, 60)
 
 client.loop_start()
 
-# ==========================================
+# =====================================================
 # DALY BMS SETUP
-# ==========================================
+# =====================================================
 
 bms = DalyBMS(request_retries=3)
 
@@ -75,17 +85,58 @@ except Exception as e:
 
     exit()
 
-# ==========================================
+# =====================================================
+# CREATE CSV FILE IF NOT EXISTS
+# =====================================================
+
+if not os.path.exists(CSV_FILE):
+
+    with open(CSV_FILE, mode='w', newline='') as file:
+
+        writer = csv.writer(file)
+
+        writer.writerow([
+            "timestamp",
+            "voltage",
+            "current",
+            "soc",
+            "max_cell_mv",
+            "min_cell_mv",
+            "delta_mv",
+            "max_temp",
+            "min_temp",
+            "charge_mosfet",
+            "discharge_mosfet",
+            "mode",
+            "capacity_ah_x100",
+            "cycles",
+            "cells",
+            "temp_sensors",
+            "charger_running",
+            "load_running",
+            "error_count",
+            "cell_voltages",
+            "temperatures",
+            "balancing"
+        ])
+
+# =====================================================
+# MQTT TIMER
+# =====================================================
+
+last_mqtt_publish = 0
+
+# =====================================================
 # MAIN LOOP
-# ==========================================
+# =====================================================
 
 while True:
 
     try:
 
-        # ==================================
-        # READ ALL BMS DATA
-        # ==================================
+        # =============================================
+        # READ BMS DATA
+        # =============================================
 
         soc = bms.get_soc()
 
@@ -101,21 +152,19 @@ while True:
 
         errors = bms.get_errors()
 
-        # ==================================
-        # SAFETY CHECKS
-        # ==================================
+        # =============================================
+        # VALIDATION
+        # =============================================
 
         if not soc:
 
             print("Failed to read SOC")
 
-            time.sleep(1)
-
             continue
 
-        # ==================================
+        # =============================================
         # PROCESS CELL VOLTAGES
-        # ==================================
+        # =============================================
 
         cv = []
 
@@ -126,9 +175,9 @@ while True:
                 for v in cell_voltages.values()
             ]
 
-        # ==================================
+        # =============================================
         # PROCESS TEMPERATURES
-        # ==================================
+        # =============================================
 
         t = []
 
@@ -136,9 +185,9 @@ while True:
 
             t = list(temps.values())
 
-        # ==================================
+        # =============================================
         # CALCULATIONS
-        # ==================================
+        # =============================================
 
         max_cell = max(cv) if cv else 0
 
@@ -150,17 +199,17 @@ while True:
 
         min_temp = min(t) if t else 0
 
-        # ==================================
+        # =============================================
         # MOSFET STATES
-        # ==================================
+        # =============================================
 
         charge_mosfet = 1 if mosfet and mosfet.get("charging_mosfet") else 0
 
         discharge_mosfet = 1 if mosfet and mosfet.get("discharging_mosfet") else 0
 
-        # ==================================
+        # =============================================
         # MODE ENCODING
-        # ==================================
+        # =============================================
 
         mode_map = {
             "stationary": 0,
@@ -174,9 +223,9 @@ while True:
             0
         ) if mosfet else 0
 
-        # ==================================
-        # BALANCING STATUS
-        # ==================================
+        # =============================================
+        # BALANCING
+        # =============================================
 
         bal = []
 
@@ -189,31 +238,23 @@ while True:
                     for x in balancing.values()
                 ]
 
-        # ==================================
+        # =============================================
         # ERROR COUNT
-        # ==================================
+        # =============================================
 
         error_count = len(errors) if errors else 0
 
-        # ==================================
-        # CREATE OPTIMIZED PAYLOAD
-        # ==================================
+        # =============================================
+        # CREATE PAYLOAD
+        # =============================================
 
         payload = {
-
-            # -----------------------------
-            # BASIC DATA
-            # -----------------------------
 
             "v": int(soc.get("total_voltage", 0) * 100),
 
             "i": int(soc.get("current", 0) * 10),
 
             "s": int(soc.get("soc_percent", 0) * 10),
-
-            # -----------------------------
-            # CELL DATA
-            # -----------------------------
 
             "cv": cv,
 
@@ -223,19 +264,11 @@ while True:
 
             "d": delta,
 
-            # -----------------------------
-            # TEMPERATURE DATA
-            # -----------------------------
-
             "t": t,
 
             "ht": max_temp,
 
             "lt": min_temp,
-
-            # -----------------------------
-            # MOSFET / MODE
-            # -----------------------------
 
             "cm": charge_mosfet,
 
@@ -247,10 +280,6 @@ while True:
                 mosfet.get("capacity_ah", 0) * 100
             ) if mosfet else 0,
 
-            # -----------------------------
-            # STATUS DATA
-            # -----------------------------
-
             "cy": status.get("cycles", 0) if status else 0,
 
             "nc": status.get("cells", 0) if status else 0,
@@ -261,51 +290,97 @@ while True:
 
             "ld": 1 if status and status.get("load_running") else 0,
 
-            # -----------------------------
-            # BALANCING
-            # -----------------------------
-
             "bal": bal,
 
-            # -----------------------------
-            # ERRORS
-            # -----------------------------
-
             "e": error_count,
-
-            # -----------------------------
-            # TIMESTAMP
-            # -----------------------------
 
             "ts": int(time.time())
         }
 
-        # ==================================
-        # MINIFIED JSON
-        # ==================================
+        # =============================================
+        # WRITE TO CSV
+        # =============================================
 
-        payload_json = json.dumps(
-            payload,
-            separators=(',', ':')
-        )
+        with open(CSV_FILE, mode='a', newline='') as file:
 
-        # ==================================
-        # MQTT PUBLISH
-        # ==================================
+            writer = csv.writer(file)
 
-        client.publish(TOPIC, payload_json)
+            writer.writerow([
 
-        print("\nPublished:")
-        print(payload_json)
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
 
-        # ==================================
-        # LOOP DELAY
-        # ==================================
+                payload["v"],
 
-        time.sleep(1)
+                payload["i"],
+
+                payload["s"],
+
+                payload["mx"],
+
+                payload["mn"],
+
+                payload["d"],
+
+                payload["ht"],
+
+                payload["lt"],
+
+                payload["cm"],
+
+                payload["dm"],
+
+                payload["m"],
+
+                payload["cap"],
+
+                payload["cy"],
+
+                payload["nc"],
+
+                payload["nt"],
+
+                payload["ch"],
+
+                payload["ld"],
+
+                payload["e"],
+
+                json.dumps(payload["cv"]),
+
+                json.dumps(payload["t"]),
+
+                json.dumps(payload["bal"])
+
+            ])
+
+        # =============================================
+        # MQTT EVERY 2 SECONDS
+        # =============================================
+
+        current_time = time.time()
+
+        if current_time - last_mqtt_publish >= 2:
+
+            payload_json = json.dumps(
+                payload,
+                separators=(',', ':')
+            )
+
+            client.publish(TOPIC, payload_json)
+
+            print("\nMQTT Published:")
+            print(payload_json)
+
+            last_mqtt_publish = current_time
+
+        # =============================================
+        # FASTEST SAFE LOOP
+        # =============================================
+
+        time.sleep(0.05)
 
     except Exception as e:
 
         print(f"Runtime Error: {e}")
 
-        time.sleep(2)
+        time.sleep(1)
